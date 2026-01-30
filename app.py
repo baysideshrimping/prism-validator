@@ -145,6 +145,8 @@ class ValidationResult:
         self.errors = []
         self.row_count = 0
         self.season = None
+        self.preview_columns = []  # Column headers
+        self.preview_data = []  # List of rows (each row is a list of values)
 
     def add_error(self, row, field, message):
         self.errors.append({
@@ -163,7 +165,9 @@ class ValidationResult:
             'row_count': self.row_count,
             'error_count': len(self.errors),
             'errors': self.errors,
-            'season': self.season
+            'season': self.season,
+            'preview_columns': self.preview_columns,
+            'preview_data': self.preview_data
         }
 
 # =============================================================================
@@ -400,6 +404,20 @@ def validate_prism_file(filepath, filename):
         return result
 
     result.row_count = len(df)
+
+    # Capture preview data (all rows, truncate cell values if too long)
+    result.preview_columns = df.columns.tolist()
+    preview_rows = []
+    for idx, row in df.iterrows():
+        row_data = []
+        for val in row.tolist():
+            # Convert to string and truncate if needed
+            str_val = str(val) if pd.notna(val) else ''
+            if len(str_val) > 50:
+                str_val = str_val[:47] + '...'
+            row_data.append(str_val)
+        preview_rows.append(row_data)
+    result.preview_data = preview_rows
 
     # Detect template type
     report_type = detect_template_type(df)
