@@ -1025,27 +1025,9 @@ def validate_data_quality(df, result):
                             if 'DOB' not in col and 'date' not in col.lower() and 'vax_date' not in col.lower():
                                 result.add_error(row_num, col, f'Mixed text and numbers: "{val_str}". Enter numbers only.')
 
-                    # Check for currency formatting
-                    if val_str.startswith('$') or val_str.startswith('-$'):
-                        result.add_error(row_num, col, f'Currency formatting not allowed: "{val_str}". Remove $ symbol.')
-
-                    # Check for percentage signs
-                    if '%' in val_str:
-                        result.add_error(row_num, col, f'Percentage sign not allowed: "{val_str}". Enter raw numbers, not percentages.')
-
-                    # Check for parentheses (accounting negative format)
-                    if val_str.startswith('(') and val_str.endswith(')'):
-                        result.add_error(row_num, col, f'Accounting format "(500)" detected: "{val_str}". Negative values are not valid for vaccination counts.')
-
-                    # Check for "about", "approximately", "~"
-                    approx_indicators = ['about', 'approx', 'approximately', '~', '>', '<', 'around', 'roughly', 'est', 'estimated']
-                    for indicator in approx_indicators:
-                        if indicator in val_str.lower():
-                            result.add_error(row_num, col, f'Approximate values not allowed: "{val_str}". Enter exact counts from your IIS.')
-
     # Run additional smart checks
+    validate_required_fields(df, result)
     validate_copy_paste_errors(df, result)
-    validate_suspicious_patterns(df, result)
     validate_zero_logic(df, result)
     validate_season_mismatch(df, result)
 
@@ -1140,6 +1122,35 @@ def validate_suspicious_patterns(df, result):
     if all_round and pop_count > 10:
         result.add_error(0, 'population',
             'All population values are round thousands. PRISM requires actual IIS population counts, not estimates.')
+
+
+def validate_required_fields(df, result):
+    """Check for blank/missing values in required numeric fields"""
+
+    num_cols = [c for c in df.columns if 'numerator' in c.lower()]
+    pop_cols = [c for c in df.columns if 'population' in c.lower()]
+
+    for idx, row in df.iterrows():
+        row_num = idx + 2
+        month_name = row.get('Month', f'Row {row_num}')
+
+        # Check for blank numerators
+        for col in num_cols:
+            if col in row.index:
+                val = row[col]
+                if pd.isna(val) or str(val).strip() == '':
+                    age_group = col.replace(' numerator', '').replace('numerator', '').strip()
+                    result.add_error(row_num, col,
+                        f'Missing value for {age_group} in {month_name}. Enter 0 if no vaccinations, or the actual count.')
+
+        # Check for blank populations
+        for col in pop_cols:
+            if col in row.index:
+                val = row[col]
+                if pd.isna(val) or str(val).strip() == '':
+                    age_group = col.replace(' population', '').replace('population', '').strip()
+                    result.add_error(row_num, col,
+                        f'Missing population for {age_group} in {month_name}. Population is required.')
 
 
 def validate_zero_logic(df, result):
