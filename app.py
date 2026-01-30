@@ -268,13 +268,22 @@ def validate_filename(filename, result, df):
         detected_type = 'RSV'
 
     if not match:
+        # Detect specific issues with the filename
+        issues = _detect_filename_issues(filename)
+
         # Build a helpful suggestion based on what we know
         suggested_filename = _suggest_filename(filename, result.report_type, expected_year, expected_month)
 
-        result.add_error(0, 'filename',
-            f'Incorrect filename format. You uploaded: "{filename}". '
-            f'Currently accepting: {expected_year} {expected_month} submissions. '
-            f'Rename to: {suggested_filename}')
+        # Create error message
+        error_msg = f'Incorrect filename format. You uploaded: "{filename}". '
+
+        if issues:
+            error_msg += 'Issues found: ' + ' '.join(issues) + ' '
+
+        error_msg += f'Currently accepting: {expected_year} {expected_month} submissions. '
+        error_msg += f'Correct format: {suggested_filename}'
+
+        result.add_error(0, 'filename', error_msg)
         return
 
     site_code, year, month = match.groups()
@@ -331,6 +340,63 @@ def _get_filename_prefix(report_type):
         'RSV': 'MonthlyRSV'
     }
     return prefixes.get(report_type, 'MonthlyAllCOVID')
+
+
+def _detect_filename_issues(filename):
+    """Detect specific issues with filename to give targeted advice"""
+    issues = []
+    name_upper = filename.upper()
+
+    # Check for spaces in filename
+    if ' ' in filename:
+        issues.append('Filename contains spaces. Use underscores instead.')
+
+    # Check for dashes where underscores expected
+    if '-' in filename and '_' not in filename:
+        issues.append('Use underscores (_) not dashes (-) to separate parts.')
+
+    # Check for common wrong prefixes
+    wrong_prefixes = [
+        ('COVID_', 'Should start with "MonthlyAllCOVID_"'),
+        ('MONTHLYCOVID_', 'Should be "MonthlyAllCOVID_" (note the "All")'),
+        ('MONTHLY_COVID_', 'Should be "MonthlyAllCOVID_" (no space/underscore)'),
+        ('FLU_', 'Should start with "MonthlyFlu_"'),
+        ('MONTHLYFLU_', 'Use "MonthlyFlu_" (check capitalization)'),
+        ('RSV_', 'Should start with "MonthlyRSV_"'),
+        ('MONTHLYRSV_', 'Use "MonthlyRSV_" (check capitalization)'),
+    ]
+    for prefix, msg in wrong_prefixes:
+        if name_upper.startswith(prefix):
+            issues.append(msg)
+            break
+
+    # Check for "draft", "final", "copy", "v2", "(1)" etc.
+    unwanted = ['DRAFT', 'FINAL', 'COPY', '(1)', '(2)', '_V2', '_V3', '_NEW', '_OLD', 'REVISED', 'UPDATED']
+    for word in unwanted:
+        if word in name_upper:
+            issues.append(f'Remove "{word}" from filename. Submit clean filename without version markers.')
+
+    # Check for wrong month formats
+    wrong_months = [
+        ('SEPT', 'Use "SEP" not "SEPT" for September'),
+        ('JUNE', 'Use "JUN" not "JUNE" for June'),
+        ('JULY', 'Use "JUL" not "JULY" for July'),
+        ('JANUARY', 'Use "JAN" not "JANUARY"'),
+        ('FEBRUARY', 'Use "FEB" not "FEBRUARY"'),
+    ]
+    for wrong, msg in wrong_months:
+        if wrong in name_upper and wrong + 'E' not in name_upper:  # Avoid false positives
+            issues.append(msg)
+
+    # Check for 2-letter state codes
+    import re
+    two_letter_match = re.search(r'_([A-Z]{2})_', name_upper)
+    if two_letter_match:
+        state = two_letter_match.group(1)
+        if state + 'A' in VALID_SITE_CODES:
+            issues.append(f'Use 3-letter IIS code "{state}A" instead of 2-letter "{state}"')
+
+    return issues
 
 
 def _suggest_filename(original_filename, detected_type, expected_year, expected_month):
@@ -441,35 +507,143 @@ def validate_structure(df, result):
     expected_cols = get_expected_columns(result.report_type)
     actual_cols = df.columns.tolist()
 
+    # First, check for old template versions
+    old_template_check = detect_old_template(actual_cols, result.report_type)
+    if old_template_check:
+        result.add_error(0, 'template',
+            f'Old template detected: {old_template_check}. Please download the current template from the Templates page.')
+        return  # Don't continue with other structure checks
+
     # Check column count
     if len(actual_cols) != len(expected_cols):
         result.add_error(0, 'structure',
-            f'Column count mismatch: expected {len(expected_cols)}, got {len(actual_cols)}')
+            f'Column count mismatch: expected {len(expected_cols)} columns, got {len(actual_cols)}. '
+            f'Download the current template to see the correct format.')
 
-    # Check for missing columns
+    # Check for missing columns with typo detection
     actual_cols_stripped = [c.strip() for c in actual_cols]
     expected_cols_stripped = [c.strip() for c in expected_cols]
 
     for expected in expected_cols_stripped:
         if expected not in actual_cols_stripped:
-            result.add_error(0, 'structure', f'Missing column: {expected}')
+            # Check for typos/close matches
+            close_match = find_close_match(expected, actual_cols_stripped)
+            if close_match:
+                result.add_error(0, 'structure',
+                    f'Column typo? Found "{close_match}" but expected "{expected}". Check spelling.')
+            else:
+                result.add_error(0, 'structure', f'Missing column: "{expected}"')
 
-    # Check for extra columns
+    # Check for extra columns (often Excel artifacts)
     for actual in actual_cols_stripped:
         if actual not in expected_cols_stripped:
-            result.add_error(0, 'structure', f'Unexpected column: {actual}')
+            if actual.startswith('Unnamed:') or actual == '':
+                result.add_error(0, 'structure',
+                    f'Extra blank column detected. Delete empty columns before exporting from Excel.')
+            else:
+                close_match = find_close_match(actual, expected_cols_stripped)
+                if close_match:
+                    result.add_error(0, 'structure',
+                        f'Unexpected column "{actual}" - did you mean "{close_match}"?')
+                else:
+                    result.add_error(0, 'structure',
+                        f'Unexpected column: "{actual}". This column is not in the PRISM template.')
 
     # Check for blank rows
     blank_rows = df.isna().all(axis=1)
     for idx, is_blank in enumerate(blank_rows):
         if is_blank:
-            result.add_error(idx + 2, 'structure', 'Blank row detected')
+            result.add_error(idx + 2, 'structure',
+                'Blank row detected. Delete empty rows before submitting.')
 
     # Check row count (should be 12 for a complete season)
     if len(df) > 0 and len(df) != 12:
-        # This is a warning-level check, might be partial submission
         if len(df) > 12:
-            result.add_error(0, 'structure', f'Too many rows: expected 12 months, got {len(df)} rows')
+            result.add_error(0, 'structure',
+                f'Too many rows: expected 12 months of data, got {len(df)} rows. '
+                f'Remove extra rows (header row not counted).')
+        elif len(df) < 12:
+            result.add_error(0, 'structure',
+                f'Only {len(df)} months of data found. A complete season has 12 months (Jul-Jun). '
+                f'Partial submissions may be intentional if mid-season.')
+
+
+def detect_old_template(columns, report_type):
+    """Check if file appears to use an outdated template version"""
+
+    # Known old column names from previous template versions
+    old_covid_columns = [
+        'COVID Season',  # Old name before standardization
+        '6 months-4 years numerator',  # Old age grouping
+        '5-11 years numerator',  # Old age grouping
+        '12-17 years numerator',  # Old age grouping
+    ]
+
+    old_flu_columns = [
+        'Season',  # Flu used to use generic "Season" in older versions
+        '6 months-4 years numerator',
+    ]
+
+    old_rsv_columns = [
+        '60-64 years numerator',  # RSV age groups changed
+        '65-74 years numerator',
+    ]
+
+    cols_lower = [c.lower().strip() for c in columns]
+
+    if report_type == 'COVID':
+        for old_col in old_covid_columns:
+            if old_col.lower() in cols_lower:
+                return f'Found old column "{old_col}"'
+
+    elif report_type == 'FLU':
+        for old_col in old_flu_columns:
+            if old_col.lower() in cols_lower:
+                return f'Found old column "{old_col}"'
+
+    elif report_type == 'RSV':
+        for old_col in old_rsv_columns:
+            if old_col.lower() in cols_lower:
+                return f'Found old column "{old_col}"'
+
+    return None
+
+
+def find_close_match(target, candidates, threshold=0.8):
+    """Find a close match using simple similarity"""
+
+    target_lower = target.lower().strip()
+
+    for candidate in candidates:
+        candidate_lower = candidate.lower().strip()
+
+        # Exact match (shouldn't happen but safety check)
+        if target_lower == candidate_lower:
+            return None
+
+        # Check for common typos: missing space, extra space, swapped characters
+        target_no_space = target_lower.replace(' ', '')
+        candidate_no_space = candidate_lower.replace(' ', '')
+
+        if target_no_space == candidate_no_space:
+            return candidate
+
+        # Check Levenshtein-style similarity (simple version)
+        if len(target_lower) > 5 and len(candidate_lower) > 5:
+            # Count matching characters
+            matches = sum(1 for a, b in zip(target_lower, candidate_lower) if a == b)
+            max_len = max(len(target_lower), len(candidate_lower))
+            similarity = matches / max_len
+
+            if similarity >= threshold:
+                return candidate
+
+        # Check if one contains the other (partial match)
+        if len(target_lower) > 10 and len(candidate_lower) > 10:
+            if target_lower in candidate_lower or candidate_lower in target_lower:
+                return candidate
+
+    return None
 
 # -----------------------------------------------------------------------------
 # TEMPLATE INTEGRITY VALIDATION
@@ -831,7 +1005,7 @@ def validate_data_quality(df, result):
                 # Check for Excel errors
                 excel_errors = ['#REF!', '#VALUE!', '#DIV/0!', '#NAME?', '#NULL!', '#N/A', '#NUM!']
                 if val_str.upper() in excel_errors:
-                    result.add_error(row_num, col, f'Excel error value: {val_str}')
+                    result.add_error(row_num, col, f'Excel error value: {val_str}. Fix the formula in your spreadsheet before exporting.')
 
                 # Check for leading/trailing whitespace in values that matter
                 if str(val) != str(val).strip():
@@ -840,9 +1014,224 @@ def validate_data_quality(df, result):
 
                 # Check for placeholder text in numeric fields
                 if 'numerator' in col.lower() or 'population' in col.lower():
-                    placeholders = ['tbd', 'n/a', 'na', 'pending', 'null', 'none', '-', '--', '...']
+                    placeholders = ['tbd', 'n/a', 'na', 'pending', 'null', 'none', '-', '--', '...', 'xxx', 'x', '?', '??']
                     if val_str.lower() in placeholders:
-                        result.add_error(row_num, col, f'Placeholder text not allowed: "{val_str}"')
+                        result.add_error(row_num, col, f'Placeholder "{val_str}" found. Replace with actual data or 0 if no data available.')
+
+                    # Check for text mixed with numbers
+                    if any(c.isalpha() for c in val_str) and any(c.isdigit() for c in val_str):
+                        if not val_str.replace('.','').replace('-','').replace('/','').replace(' ','').isdigit():
+                            # Not a date format
+                            if 'DOB' not in col and 'date' not in col.lower() and 'vax_date' not in col.lower():
+                                result.add_error(row_num, col, f'Mixed text and numbers: "{val_str}". Enter numbers only.')
+
+                    # Check for currency formatting
+                    if val_str.startswith('$') or val_str.startswith('-$'):
+                        result.add_error(row_num, col, f'Currency formatting not allowed: "{val_str}". Remove $ symbol.')
+
+                    # Check for percentage signs
+                    if '%' in val_str:
+                        result.add_error(row_num, col, f'Percentage sign not allowed: "{val_str}". Enter raw numbers, not percentages.')
+
+                    # Check for parentheses (accounting negative format)
+                    if val_str.startswith('(') and val_str.endswith(')'):
+                        result.add_error(row_num, col, f'Accounting format "(500)" detected: "{val_str}". Negative values are not valid for vaccination counts.')
+
+                    # Check for "about", "approximately", "~"
+                    approx_indicators = ['about', 'approx', 'approximately', '~', '>', '<', 'around', 'roughly', 'est', 'estimated']
+                    for indicator in approx_indicators:
+                        if indicator in val_str.lower():
+                            result.add_error(row_num, col, f'Approximate values not allowed: "{val_str}". Enter exact counts from your IIS.')
+
+    # Run additional smart checks
+    validate_copy_paste_errors(df, result)
+    validate_suspicious_patterns(df, result)
+    validate_zero_logic(df, result)
+    validate_season_mismatch(df, result)
+
+
+def validate_copy_paste_errors(df, result):
+    """Detect when data was likely copy-pasted across months without updating"""
+
+    num_cols = [c for c in df.columns if 'numerator' in c.lower()]
+
+    if len(df) < 3:
+        return
+
+    for col in num_cols:
+        values = []
+        for idx, row in df.iterrows():
+            val = row[col]
+            if pd.notna(val):
+                try:
+                    values.append(int(float(val)))
+                except:
+                    values.append(None)
+            else:
+                values.append(None)
+
+        # Check for 3+ consecutive identical non-zero values
+        consecutive_same = 1
+        for i in range(1, len(values)):
+            if values[i] is not None and values[i-1] is not None and values[i] == values[i-1] and values[i] > 0:
+                consecutive_same += 1
+                if consecutive_same >= 3:
+                    # Extract age group name from column
+                    age_group = col.replace(' numerator', '').replace(' numerator ', '')
+                    result.add_error(0, col,
+                        f'Possible copy-paste error: {age_group} has identical values ({values[i]:,}) for 3+ consecutive months. Cumulative data should increase monthly.')
+                    break
+            else:
+                consecutive_same = 1
+
+
+def validate_suspicious_patterns(df, result):
+    """Detect suspicious data patterns that suggest errors"""
+
+    num_cols = [c for c in df.columns if 'numerator' in c.lower()]
+    pop_cols = [c for c in df.columns if 'population' in c.lower()]
+
+    for idx, row in df.iterrows():
+        row_num = idx + 2
+
+        # Check for 100% vaccination rates (rare and suspicious)
+        for num_col in num_cols:
+            # Find matching population column
+            base_name = num_col.replace('numerator', '').strip()
+            pop_col = None
+            for pc in pop_cols:
+                if base_name in pc:
+                    pop_col = pc
+                    break
+
+            if pop_col and num_col in row.index and pop_col in row.index:
+                num_val = row[num_col]
+                pop_val = row[pop_col]
+
+                if pd.notna(num_val) and pd.notna(pop_val):
+                    try:
+                        num = int(float(num_val))
+                        pop = int(float(pop_val))
+
+                        if pop > 0 and num == pop and num > 100:
+                            result.add_error(row_num, num_col,
+                                f'Exactly 100% vaccination rate ({num:,}/{pop:,}) is unusual. Please verify this is correct.')
+                    except:
+                        pass
+
+    # Check if ALL populations are round thousands (suggests estimates, not real IIS data)
+    all_round = True
+    pop_count = 0
+    for col in pop_cols:
+        for idx, row in df.iterrows():
+            val = row[col]
+            if pd.notna(val):
+                try:
+                    pop = int(float(val))
+                    pop_count += 1
+                    if pop > 0 and pop % 1000 != 0:
+                        all_round = False
+                        break
+                except:
+                    pass
+        if not all_round:
+            break
+
+    if all_round and pop_count > 10:
+        result.add_error(0, 'population',
+            'All population values are round thousands. PRISM requires actual IIS population counts, not estimates.')
+
+
+def validate_zero_logic(df, result):
+    """Check for illogical zero values"""
+
+    num_cols = [c for c in df.columns if 'numerator' in c.lower()]
+    pop_cols = [c for c in df.columns if 'population' in c.lower()]
+
+    for idx, row in df.iterrows():
+        row_num = idx + 2
+
+        # Check: population is 0 but numerator > 0 (impossible)
+        for num_col in num_cols:
+            base_name = num_col.replace('numerator', '').strip()
+            pop_col = None
+            for pc in pop_cols:
+                if base_name in pc:
+                    pop_col = pc
+                    break
+
+            if pop_col and num_col in row.index and pop_col in row.index:
+                num_val = row[num_col]
+                pop_val = row[pop_col]
+
+                if pd.notna(num_val) and pd.notna(pop_val):
+                    try:
+                        num = int(float(num_val))
+                        pop = int(float(pop_val))
+
+                        if pop == 0 and num > 0:
+                            result.add_error(row_num, pop_col,
+                                f'Population is 0 but {num:,} vaccinations reported. Cannot vaccinate people who don\'t exist.')
+                    except:
+                        pass
+
+        # Check: ALL numerators in a row are 0 (might be incomplete)
+        all_zero = True
+        has_data = False
+        for col in num_cols:
+            if col in row.index:
+                val = row[col]
+                if pd.notna(val):
+                    has_data = True
+                    try:
+                        if int(float(val)) != 0:
+                            all_zero = False
+                            break
+                    except:
+                        all_zero = False
+
+        if has_data and all_zero:
+            month_col = 'Month' if 'Month' in row.index else None
+            month_name = row[month_col] if month_col else f'Row {row_num}'
+            result.add_error(row_num, 'numerator',
+                f'All numerators are 0 for {month_name}. If no vaccinations occurred, this is correct. Otherwise, data may be missing.')
+
+
+def validate_season_mismatch(df, result):
+    """Check for mismatches between filename season and data season"""
+
+    # Get season from data
+    season_col = None
+    if 'RSV Season' in df.columns:
+        season_col = 'RSV Season'
+    elif 'Flu Season' in df.columns:
+        season_col = 'Flu Season'
+    elif 'Season' in df.columns:
+        season_col = 'Season'
+
+    if season_col and len(df) > 0:
+        data_season = str(df[season_col].iloc[0]).strip() if pd.notna(df[season_col].iloc[0]) else None
+
+        if data_season:
+            # Get expected season from config
+            config = load_config()
+            expected_year = config.get('expected_year', DEFAULT_EXPECTED_YEAR)
+            expected_month = config.get('expected_month', DEFAULT_EXPECTED_MONTH)
+
+            # Determine expected season based on year/month
+            # Flu/RSV season runs Jul-Jun, so Jan 2026 would be 2025-26 season
+            month_to_num = {'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'MAY': 5, 'JUN': 6,
+                          'JUL': 7, 'AUG': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DEC': 12}
+            month_num = month_to_num.get(expected_month, 1)
+
+            if month_num >= 7:  # Jul-Dec
+                expected_season = f"{expected_year}-{str(expected_year + 1)[2:]}"
+            else:  # Jan-Jun
+                expected_season = f"{expected_year - 1}-{str(expected_year)[2:]}"
+
+            if data_season != expected_season:
+                result.add_error(0, season_col,
+                    f'Season mismatch: Data shows "{data_season}" but currently accepting {expected_year} {expected_month} submissions (season {expected_season}).')
 
 # =============================================================================
 # ROUTES
