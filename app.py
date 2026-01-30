@@ -74,15 +74,34 @@ RSV_COLUMNS = [
 
 VALID_MONTHS = ['Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
 
-# Valid state abbreviations
-VALID_STATES = [
-    'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-    'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-    'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-    'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-    'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
-    'DC', 'PR', 'VI', 'GU', 'AS', 'MP'  # Territories
-]
+# Valid 3-letter site codes (IIS grantee codes)
+VALID_SITE_CODES = {
+    'AKA': 'Alaska', 'ALA': 'Alabama', 'ARA': 'Arkansas', 'ASA': 'American Samoa',
+    'AZA': 'Arizona', 'BAA': 'NYC', 'CAA': 'California', 'CHA': 'Chicago',
+    'COA': 'Colorado', 'CTA': 'Connecticut', 'DCA': 'DC', 'DEA': 'Delaware',
+    'FLA': 'Florida', 'FMA': 'Micronesia', 'GAA': 'Georgia', 'GUA': 'Guam',
+    'HIA': 'Hawaii', 'IAA': 'Iowa', 'IDA': 'Idaho', 'ILA': 'Illinois',
+    'INA': 'Indiana', 'KSA': 'Kansas', 'KYA': 'Kentucky', 'LAA': 'Louisiana',
+    'MAA': 'Massachusetts', 'MDA': 'Maryland', 'MEA': 'Maine', 'MHA': 'Marshall Islands',
+    'MIA': 'Michigan', 'MNA': 'Minnesota', 'MOA': 'Missouri', 'MPA': 'N Mariana Islands',
+    'MSA': 'Mississippi', 'MTA': 'Montana', 'NCA': 'North Carolina', 'NDA': 'North Dakota',
+    'NEA': 'Nebraska', 'NHA': 'New Hampshire', 'NJA': 'New Jersey', 'NMA': 'New Mexico',
+    'NVA': 'Nevada', 'NYA': 'New York State', 'OHA': 'Ohio', 'OKA': 'Oklahoma',
+    'ORA': 'Oregon', 'PAA': 'Pennsylvania', 'PHA': 'Philadelphia', 'PRA': 'Puerto Rico',
+    'RIA': 'Rhode Island', 'RPA': 'Palau', 'SCA': 'South Carolina', 'SDA': 'South Dakota',
+    'TBA': 'San Antonio', 'THA': 'Houston', 'TNA': 'Tennessee', 'TXA': 'Texas',
+    'UTA': 'Utah', 'VAA': 'Virginia', 'VIA': 'Virgin Islands', 'VTA': 'Vermont',
+    'WAA': 'Washington State', 'WIA': 'Wisconsin', 'WVA': 'West Virginia', 'WYA': 'Wyoming'
+}
+
+# 3-letter month abbreviations for filenames
+FILENAME_MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+
+# Map filename months to data months
+MONTH_MAP = {
+    'JAN': 'Jan', 'FEB': 'Feb', 'MAR': 'Mar', 'APR': 'Apr', 'MAY': 'May', 'JUN': 'Jun',
+    'JUL': 'Jul', 'AUG': 'Aug', 'SEP': 'Sept', 'OCT': 'Oct', 'NOV': 'Nov', 'DEC': 'Dec'
+}
 
 # Age group definitions for rollup validation
 COVID_FLU_CHILD_GROUPS = ['6 months-23 months', '2-4 years', '5-8 years', '9-12 years', '13-17 years']
@@ -190,29 +209,30 @@ def get_expected_columns(report_type):
 def validate_filename(filename, result, df):
     """
     Validate filename follows expected format:
-    {STATE}_{TYPE}_{SEASON}_{MONTH}.csv
-    Example: GA_COVID_2025-26_Jul.csv, NY_FLU_2025-26_Aug.csv, CA_RSV_2024-25_Sept.csv
+    {SITE_CODE}_{TYPE}_{SEASON}_{MONTH}.csv
+    Example: GAA_COVID_2025-26_JUL.csv, NYA_FLU_2025-26_AUG.csv, CAA_RSV_2024-25_SEP.csv
     """
     # Remove .csv extension
     name = filename.replace('.csv', '').replace('.CSV', '')
 
-    # Expected pattern: STATE_TYPE_SEASON_MONTH
-    pattern = r'^([A-Z]{2})_(COVID|FLU|RSV)_(\d{4}-\d{2})_([A-Za-z]+)$'
+    # Expected pattern: SITECODE_TYPE_SEASON_MONTH (3-letter site code, 3-letter month)
+    pattern = r'^([A-Z]{3})_(COVID|FLU|RSV)_(\d{4}-\d{2})_([A-Z]{3})$'
     match = re.match(pattern, name, re.IGNORECASE)
 
     if not match:
         result.add_error(0, 'filename',
-            f'Invalid filename format. Expected: STATE_TYPE_SEASON_MONTH.csv (e.g., GA_COVID_2025-26_Jul.csv)')
+            f'Invalid filename format. Expected: SITECODE_TYPE_SEASON_MONTH.csv (e.g., GAA_COVID_2025-26_JUL.csv)')
         return
 
-    state, file_type, season, month = match.groups()
-    state = state.upper()
+    site_code, file_type, season, month = match.groups()
+    site_code = site_code.upper()
     file_type = file_type.upper()
-    month = month.capitalize()
+    month = month.upper()
 
-    # Validate state
-    if state not in VALID_STATES:
-        result.add_error(0, 'filename', f'Invalid state abbreviation in filename: {state}')
+    # Validate site code
+    if site_code not in VALID_SITE_CODES:
+        result.add_error(0, 'filename',
+            f'Invalid site code in filename: {site_code}. Expected 3-letter IIS grantee code (e.g., GAA, NYA, CAA)')
 
     # Validate type matches detected type
     if result.report_type and file_type != result.report_type:
@@ -223,14 +243,11 @@ def validate_filename(filename, result, df):
     if not validate_season_format(season):
         result.add_error(0, 'filename', f'Invalid season format in filename: {season}')
 
-    # Validate month
-    if month not in VALID_MONTHS:
-        # Try common variations
-        month_map = {'Sep': 'Sept', 'September': 'Sept', 'July': 'Jul', 'August': 'Aug'}
-        month = month_map.get(month, month)
-        if month not in VALID_MONTHS:
-            result.add_error(0, 'filename',
-                f'Invalid month in filename: {month}. Expected one of: {", ".join(VALID_MONTHS)}')
+    # Validate month (3-letter format)
+    if month not in FILENAME_MONTHS:
+        result.add_error(0, 'filename',
+            f'Invalid month in filename: {month}. Expected one of: {", ".join(FILENAME_MONTHS)}')
+        return
 
     # Check if season in filename matches data
     if result.season and season != result.season:
@@ -239,8 +256,9 @@ def validate_filename(filename, result, df):
 
     # Check if file contains data for the month specified in filename
     if 'Month' in df.columns:
+        data_month = MONTH_MAP.get(month, month)  # Convert JUL -> Jul, SEP -> Sept
         months_in_data = [str(m).strip() for m in df['Month'].tolist() if pd.notna(m)]
-        if month not in months_in_data:
+        if data_month not in months_in_data:
             result.add_error(0, 'filename',
                 f'Month in filename ({month}) not found in data. Data contains: {", ".join(months_in_data[:3])}...')
 
