@@ -241,6 +241,11 @@ def validate_filename(filename, result, df):
     - MonthlyFlu_GAA_2025FEB.csv
     - MonthlyRSV_NCA_2024JUL.csv
     """
+    # Get expected submission period from config
+    config = load_config()
+    expected_year = config.get('expected_year', DEFAULT_EXPECTED_YEAR)
+    expected_month = config.get('expected_month', DEFAULT_EXPECTED_MONTH)
+
     # Remove .csv extension
     name = filename.replace('.csv', '').replace('.CSV', '')
 
@@ -263,8 +268,13 @@ def validate_filename(filename, result, df):
         detected_type = 'RSV'
 
     if not match:
+        # Build a helpful suggestion based on what we know
+        suggested_filename = _suggest_filename(filename, result.report_type, expected_year, expected_month)
+
         result.add_error(0, 'filename',
-            f'Invalid filename format. Expected: MonthlyAllCOVID_SITE_YYYYMON.csv, MonthlyFlu_SITE_YYYYMON.csv, or MonthlyRSV_SITE_YYYYMON.csv (e.g., MonthlyAllCOVID_BAA_2024JAN.csv)')
+            f'Incorrect filename format. You uploaded: "{filename}". '
+            f'Currently accepting: {expected_year} {expected_month} submissions. '
+            f'Rename to: {suggested_filename}')
         return
 
     site_code, year, month = match.groups()
@@ -274,12 +284,14 @@ def validate_filename(filename, result, df):
     # Validate site code
     if site_code not in VALID_SITE_CODES:
         result.add_error(0, 'filename',
-            f'Invalid site code in filename: {site_code}. Expected 3-letter IIS grantee code (e.g., GAA, NYA, BAA)')
+            f'Invalid site code: "{site_code}". Use your 3-letter IIS grantee code (e.g., GAA for Georgia, NYA for New York)')
 
     # Validate type matches detected template type
     if result.report_type and detected_type != result.report_type:
+        prefix = _get_filename_prefix(result.report_type)
         result.add_error(0, 'filename',
-            f'Filename type ({detected_type}) does not match detected template type ({result.report_type})')
+            f'Filename says {detected_type} but data looks like {result.report_type}. '
+            f'Rename to: {prefix}_{site_code}_{expected_year}{expected_month}.csv')
 
     # Validate year is reasonable
     try:
@@ -292,17 +304,15 @@ def validate_filename(filename, result, df):
     # Validate month (3-letter format)
     if month not in FILENAME_MONTHS:
         result.add_error(0, 'filename',
-            f'Invalid month in filename: {month}. Expected one of: {", ".join(FILENAME_MONTHS)}')
+            f'Invalid month: "{month}". Use 3-letter format: JAN, FEB, MAR, APR, MAY, JUN, JUL, AUG, SEP, OCT, NOV, DEC')
         return
 
     # Check against expected submission period
-    config = load_config()
-    expected_year = config.get('expected_year', DEFAULT_EXPECTED_YEAR)
-    expected_month = config.get('expected_month', DEFAULT_EXPECTED_MONTH)
-
     if year != str(expected_year) or month != expected_month:
+        prefix = _get_filename_prefix(detected_type)
         result.add_error(0, 'filename',
-            f'Submission period mismatch. Expected {expected_year}{expected_month}, got {year}{month}')
+            f'Wrong submission period. You submitted {year} {month} data, but currently accepting {expected_year} {expected_month}. '
+            f'Rename to: {prefix}_{site_code}_{expected_year}{expected_month}.csv')
 
     # Check if file contains data for the month specified in filename
     if 'Month' in df.columns:
@@ -311,6 +321,59 @@ def validate_filename(filename, result, df):
         if data_month not in months_in_data:
             result.add_error(0, 'filename',
                 f'Month in filename ({month}) not found in data. Data contains: {", ".join(months_in_data[:3])}...')
+
+
+def _get_filename_prefix(report_type):
+    """Get the correct filename prefix for a report type"""
+    prefixes = {
+        'COVID': 'MonthlyAllCOVID',
+        'FLU': 'MonthlyFlu',
+        'RSV': 'MonthlyRSV'
+    }
+    return prefixes.get(report_type, 'MonthlyAllCOVID')
+
+
+def _suggest_filename(original_filename, detected_type, expected_year, expected_month):
+    """
+    Try to suggest the correct filename based on what we can parse from the original
+    and what we detected from the data content.
+    """
+    # Try to extract a site code from the original filename
+    site_code = 'XXX'  # placeholder
+
+    # Look for common state abbreviations or site codes in the filename
+    upper_name = original_filename.upper()
+
+    # Check for 3-letter codes first
+    for code in VALID_SITE_CODES.keys():
+        if code in upper_name:
+            site_code = code
+            break
+
+    # If no 3-letter code found, try to find 2-letter state abbreviations and convert
+    if site_code == 'XXX':
+        state_to_site = {
+            'GA': 'GAA', 'NY': 'NYA', 'CA': 'CAA', 'TX': 'TXA', 'FL': 'FLA',
+            'NC': 'NCA', 'PA': 'PAA', 'IL': 'ILA', 'OH': 'OHA', 'MI': 'MIA',
+            'AK': 'AKA', 'AL': 'ALA', 'AR': 'ARA', 'AZ': 'AZA', 'CO': 'COA',
+            'CT': 'CTA', 'DE': 'DEA', 'HI': 'HIA', 'IA': 'IAA', 'ID': 'IDA',
+            'IN': 'INA', 'KS': 'KSA', 'KY': 'KYA', 'LA': 'LAA', 'MA': 'MAA',
+            'MD': 'MDA', 'ME': 'MEA', 'MN': 'MNA', 'MO': 'MOA', 'MS': 'MSA',
+            'MT': 'MTA', 'NE': 'NEA', 'NH': 'NHA', 'NJ': 'NJA', 'NM': 'NMA',
+            'NV': 'NVA', 'OK': 'OKA', 'OR': 'ORA', 'RI': 'RIA', 'SC': 'SCA',
+            'SD': 'SDA', 'TN': 'TNA', 'UT': 'UTA', 'VA': 'VAA', 'VT': 'VTA',
+            'WA': 'WAA', 'WI': 'WIA', 'WV': 'WVA', 'WY': 'WYA'
+        }
+        for state, code in state_to_site.items():
+            # Look for state code with word boundary (underscore, start/end)
+            if f'_{state}_' in upper_name or upper_name.startswith(f'{state}_') or f'_{state}.' in upper_name:
+                site_code = code
+                break
+
+    # Get the right prefix based on detected type
+    prefix = _get_filename_prefix(detected_type)
+
+    return f'{prefix}_{site_code}_{expected_year}{expected_month}.csv'
 
 # =============================================================================
 # VALIDATION FUNCTIONS
