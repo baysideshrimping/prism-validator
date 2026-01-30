@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Templates - PRISM Validator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        nav {
+            background: linear-gradient(135deg, #1a5276 0%, #2980b9 100%);
+            padding: 15px 20px;
+            margin-bottom: 30px;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            gap: 30px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        nav a:hover, nav a.active {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: white;
+            margin-right: auto;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            color: #1a5276;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .template-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .template-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .template-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+
+        .template-card.covid { border-top: 4px solid #e74c3c; }
+        .template-card.flu { border-top: 4px solid #27ae60; }
+        .template-card.rsv { border-top: 4px solid #9b59b6; }
+
+        .template-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .template-card.covid .template-icon { color: #e74c3c; }
+        .template-card.flu .template-icon { color: #27ae60; }
+        .template-card.rsv .template-icon { color: #9b59b6; }
+
+        .template-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .template-card p {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+
+        .template-card .specs {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            color: #555;
+        }
+
+        .download-btn {
+            display: inline-block;
+            background: #2980b9;
+            color: white;
+            padding: 12px 25px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .download-btn:hover {
+            background: #1a5276;
+        }
+
+        .template-card.covid .download-btn { background: #e74c3c; }
+        .template-card.covid .download-btn:hover { background: #c0392b; }
+        .template-card.flu .download-btn { background: #27ae60; }
+        .template-card.flu .download-btn:hover { background: #1e8449; }
+        .template-card.rsv .download-btn { background: #9b59b6; }
+        .template-card.rsv .download-btn:hover { background: #7d3c98; }
+
+        .naming-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .naming-section h2 {
+            color: #1a5276;
+            margin-bottom: 20px;
+        }
+
+        .naming-format {
+            background: #1a5276;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 1.1rem;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .naming-examples {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .naming-examples {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .example {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+        }
+
+        .example code {
+            display: block;
+            font-size: 0.9rem;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .example span {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .naming-parts {
+            margin-top: 20px;
+            padding: 20px;
+            background: #ebf5fb;
+            border-radius: 8px;
+        }
+
+        .naming-parts ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .naming-parts li {
+            font-size: 0.9rem;
+        }
+
+        .naming-parts li strong {
+            color: #1a5276;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li class="logo">PRISM Validator</li>
+            <li><a href="/submit">Submit Data</a></li>
+            <li><a href="/validation">Dashboard</a></li>
+            <li><a href="/templates" class="active">Templates</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>Download Templates</h1>
+            <p>Get blank CSV templates for COVID, Flu, and RSV aggregate reporting</p>
+        </header>
+
+        <div class="template-grid">
+            <div class="template-card covid">
+                <div class="template-icon">🦠</div>
+                <h3>COVID-19 Template</h3>
+                <p>Monthly aggregate vaccination data for COVID-19</p>
+                <div class="specs">
+                    37 columns | 12 rows per season<br>
+                    Version 4 (2025-26)
+                </div>
+                <a href="/download/covid" class="download-btn">Download CSV</a>
+            </div>
+
+            <div class="template-card flu">
+                <div class="template-icon">🤧</div>
+                <h3>Influenza Template</h3>
+                <p>Seasonal flu vaccination coverage reporting</p>
+                <div class="specs">
+                    37 columns | 12 rows per season<br>
+                    Version 1 (2025-26)
+                </div>
+                <a href="/download/flu" class="download-btn">Download CSV</a>
+            </div>
+
+            <div class="template-card rsv">
+                <div class="template-icon">🫁</div>
+                <h3>RSV Template</h3>
+                <p>RSV vaccination for infants and 60+ adults</p>
+                <div class="specs">
+                    24 columns | 12 rows per season<br>
+                    Version 5 (2024-25)
+                </div>
+                <a href="/download/rsv" class="download-btn">Download CSV</a>
+            </div>
+        </div>
+
+        <div class="naming-section">
+            <h2>File Naming Convention</h2>
+            <div class="naming-format">
+                {STATE}_{TYPE}_{SEASON}_{MONTH}.csv
+            </div>
+
+            <div class="naming-examples">
+                <div class="example">
+                    <code>GA_COVID_2025-26_Jul.csv</code>
+                    <span>Georgia COVID data for July</span>
+                </div>
+                <div class="example">
+                    <code>NY_FLU_2025-26_Oct.csv</code>
+                    <span>New York Flu data for October</span>
+                </div>
+                <div class="example">
+                    <code>CA_RSV_2024-25_Sept.csv</code>
+                    <span>California RSV data for September</span>
+                </div>
+            </div>
+
+            <div class="naming-parts">
+                <ul>
+                    <li><strong>STATE:</strong> 2-letter state abbreviation (GA, NY, CA, TX...)</li>
+                    <li><strong>TYPE:</strong> COVID, FLU, or RSV</li>
+                    <li><strong>SEASON:</strong> Fiscal year format YYYY-YY (2025-26)</li>
+                    <li><strong>MONTH:</strong> Jul, Aug, Sept, Oct, Nov, Dec, Jan, Feb, Mar, Apr, May, Jun</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

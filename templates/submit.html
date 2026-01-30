@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit Data - PRISM Validator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        nav {
+            background: linear-gradient(135deg, #1a5276 0%, #2980b9 100%);
+            padding: 15px 20px;
+            margin-bottom: 30px;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            gap: 30px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        nav a:hover, nav a.active {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: white;
+            margin-right: auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            color: #1a5276;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .upload-area {
+            background: white;
+            border: 3px dashed #bdc3c7;
+            border-radius: 12px;
+            padding: 60px 40px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-bottom: 30px;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #2980b9;
+            background: #ebf5fb;
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            color: #2980b9;
+            margin-bottom: 20px;
+        }
+
+        .upload-area h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .upload-area p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .btn {
+            display: inline-block;
+            background: #2980b9;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #1a5276;
+        }
+
+        .selected-files-list {
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .selected-file-item {
+            background: #ebf5fb;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .file-count {
+            background: #2980b9;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            margin-top: 15px;
+            display: inline-block;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .template-info {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .template-info h3 {
+            color: #1a5276;
+            margin-bottom: 20px;
+        }
+
+        .template-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .template-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .template-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid #2980b9;
+        }
+
+        .template-card.covid { border-left-color: #e74c3c; }
+        .template-card.flu { border-left-color: #27ae60; }
+        .template-card.rsv { border-left-color: #9b59b6; }
+
+        .template-card h4 {
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .template-card .badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            color: white;
+        }
+
+        .template-card.covid .badge { background: #e74c3c; }
+        .template-card.flu .badge { background: #27ae60; }
+        .template-card.rsv .badge { background: #9b59b6; }
+
+        .template-card p {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .template-card code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.85rem;
+        }
+
+        .validation-list {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .validation-list h4 {
+            color: #1a5276;
+            margin-bottom: 15px;
+        }
+
+        .validation-list ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        @media (max-width: 600px) {
+            .validation-list ul {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .validation-list li {
+            font-size: 0.9rem;
+            color: #555;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .validation-list li::before {
+            content: "\2713";
+            position: absolute;
+            left: 0;
+            color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li class="logo">PRISM Validator</li>
+            <li><a href="/submit" class="active">Submit Data</a></li>
+            <li><a href="/validation">Dashboard</a></li>
+            <li><a href="/templates">Templates</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>Submit PRISM Data</h1>
+            <p>Upload COVID, Flu, or RSV aggregate vaccination data for validation</p>
+        </header>
+
+        {% if message %}
+        <div class="alert success">{{ message }}</div>
+        {% endif %}
+
+        {% if error %}
+        <div class="alert error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" enctype="multipart/form-data" id="uploadForm">
+            <div class="upload-area" id="dropZone">
+                <div class="upload-icon">📊</div>
+                <h2>Drag & Drop your files here</h2>
+                <p>or click to browse (CSV files, multiple supported)</p>
+                <input type="file" name="files" id="fileInput" class="file-input" accept=".csv" multiple>
+                <button type="button" class="btn" onclick="document.getElementById('fileInput').click()">
+                    Select Files
+                </button>
+                <div id="selectedFiles" class="selected-files-list"></div>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn" style="width: 100%; display: none;">
+                Upload & Validate All Files
+            </button>
+        </form>
+
+        <div class="template-info">
+            <h3>Supported PRISM Templates</h3>
+
+            <div class="template-cards">
+                <div class="template-card covid">
+                    <h4>COVID-19 <span class="badge">v4</span></h4>
+                    <p>Monthly aggregate vaccination data by age group</p>
+                    <p><code>37 columns</code> | <code>12 rows/season</code></p>
+                </div>
+
+                <div class="template-card flu">
+                    <h4>Influenza <span class="badge">v1</span></h4>
+                    <p>Seasonal flu vaccination coverage reporting</p>
+                    <p><code>37 columns</code> | <code>12 rows/season</code></p>
+                </div>
+
+                <div class="template-card rsv">
+                    <h4>RSV <span class="badge">v5</span></h4>
+                    <p>RSV vaccination for infants and 60+ adults</p>
+                    <p><code>24 columns</code> | <code>12 rows/season</code></p>
+                </div>
+            </div>
+
+            <div class="validation-list">
+                <h4>What We Validate (~40 checks)</h4>
+                <ul>
+                    <li>Correct template structure</li>
+                    <li>Column names and order</li>
+                    <li>Valid integer values</li>
+                    <li>Non-negative numbers</li>
+                    <li>Numerator <= Population</li>
+                    <li>Rollup math accuracy</li>
+                    <li>Cumulative data integrity</li>
+                    <li>Season format (YYYY-YY)</li>
+                    <li>Month sequence validation</li>
+                    <li>No placeholder text</li>
+                    <li>No Excel error values</li>
+                    <li>Population stability</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const selectedFiles = document.getElementById('selectedFiles');
+        const submitBtn = document.getElementById('submitBtn');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                showSelectedFiles(files);
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                showSelectedFiles(fileInput.files);
+            }
+        });
+
+        function showSelectedFiles(files) {
+            selectedFiles.innerHTML = '';
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const div = document.createElement('div');
+                div.className = 'selected-file-item';
+                div.innerHTML = `
+                    <div class="file-info">
+                        <span>📄</span>
+                        <span>${file.name} (${formatFileSize(file.size)})</span>
+                    </div>
+                `;
+                selectedFiles.appendChild(div);
+            }
+            if (files.length > 0) {
+                const countDiv = document.createElement('div');
+                countDiv.className = 'file-count';
+                countDiv.textContent = files.length + ' file' + (files.length > 1 ? 's' : '') + ' selected';
+                selectedFiles.appendChild(countDiv);
+                submitBtn.style.display = 'block';
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+    </script>
+</body>
+</html>
