@@ -208,51 +208,69 @@ def get_expected_columns(report_type):
 
 def validate_filename(filename, result, df):
     """
-    Validate filename follows expected format:
-    {SITE_CODE}_{TYPE}_{SEASON}_{MONTH}.csv
-    Example: GAA_COVID_2025-26_JUL.csv, NYA_FLU_2025-26_AUG.csv, CAA_RSV_2024-25_SEP.csv
+    Validate filename follows expected CDC PRISM format:
+    MonthlyAllCOVID_{SITE}_{YYYYMON}.csv
+    MonthlyFlu_{SITE}_{YYYYMON}.csv
+    MonthlyRSV_{SITE}_{YYYYMON}.csv
+
+    Examples:
+    - MonthlyAllCOVID_BAA_2024JAN.csv
+    - MonthlyFlu_GAA_2025FEB.csv
+    - MonthlyRSV_NCA_2024JUL.csv
     """
     # Remove .csv extension
     name = filename.replace('.csv', '').replace('.CSV', '')
 
-    # Expected pattern: SITECODE_TYPE_SEASON_MONTH (3-letter site code, 3-letter month)
-    pattern = r'^([A-Z]{3})_(COVID|FLU|RSV)_(\d{4}-\d{2})_([A-Z]{3})$'
-    match = re.match(pattern, name, re.IGNORECASE)
+    # Expected patterns for each type
+    covid_pattern = r'^MonthlyAllCOVID_([A-Z]{3})_(\d{4})([A-Z]{3})$'
+    flu_pattern = r'^MonthlyFlu_([A-Z]{3})_(\d{4})([A-Z]{3})$'
+    rsv_pattern = r'^MonthlyRSV_([A-Z]{3})_(\d{4})([A-Z]{3})$'
+
+    match = None
+    detected_type = None
+
+    if re.match(covid_pattern, name, re.IGNORECASE):
+        match = re.match(covid_pattern, name, re.IGNORECASE)
+        detected_type = 'COVID'
+    elif re.match(flu_pattern, name, re.IGNORECASE):
+        match = re.match(flu_pattern, name, re.IGNORECASE)
+        detected_type = 'FLU'
+    elif re.match(rsv_pattern, name, re.IGNORECASE):
+        match = re.match(rsv_pattern, name, re.IGNORECASE)
+        detected_type = 'RSV'
 
     if not match:
         result.add_error(0, 'filename',
-            f'Invalid filename format. Expected: SITECODE_TYPE_SEASON_MONTH.csv (e.g., GAA_COVID_2025-26_JUL.csv)')
+            f'Invalid filename format. Expected: MonthlyAllCOVID_SITE_YYYYMON.csv, MonthlyFlu_SITE_YYYYMON.csv, or MonthlyRSV_SITE_YYYYMON.csv (e.g., MonthlyAllCOVID_BAA_2024JAN.csv)')
         return
 
-    site_code, file_type, season, month = match.groups()
+    site_code, year, month = match.groups()
     site_code = site_code.upper()
-    file_type = file_type.upper()
     month = month.upper()
 
     # Validate site code
     if site_code not in VALID_SITE_CODES:
         result.add_error(0, 'filename',
-            f'Invalid site code in filename: {site_code}. Expected 3-letter IIS grantee code (e.g., GAA, NYA, CAA)')
+            f'Invalid site code in filename: {site_code}. Expected 3-letter IIS grantee code (e.g., GAA, NYA, BAA)')
 
-    # Validate type matches detected type
-    if result.report_type and file_type != result.report_type:
+    # Validate type matches detected template type
+    if result.report_type and detected_type != result.report_type:
         result.add_error(0, 'filename',
-            f'Filename type ({file_type}) does not match detected template type ({result.report_type})')
+            f'Filename type ({detected_type}) does not match detected template type ({result.report_type})')
 
-    # Validate season format
-    if not validate_season_format(season):
-        result.add_error(0, 'filename', f'Invalid season format in filename: {season}')
+    # Validate year is reasonable
+    try:
+        year_int = int(year)
+        if year_int < 2020 or year_int > 2030:
+            result.add_error(0, 'filename', f'Year in filename ({year}) seems invalid')
+    except:
+        result.add_error(0, 'filename', f'Invalid year in filename: {year}')
 
     # Validate month (3-letter format)
     if month not in FILENAME_MONTHS:
         result.add_error(0, 'filename',
             f'Invalid month in filename: {month}. Expected one of: {", ".join(FILENAME_MONTHS)}')
         return
-
-    # Check if season in filename matches data
-    if result.season and season != result.season:
-        result.add_error(0, 'filename',
-            f'Season in filename ({season}) does not match data season ({result.season})')
 
     # Check if file contains data for the month specified in filename
     if 'Month' in df.columns:

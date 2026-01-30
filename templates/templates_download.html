@@ -286,30 +286,30 @@
         <div class="naming-section">
             <h2>File Naming Convention</h2>
             <div class="naming-format">
-                {SITE_CODE}_{TYPE}_{SEASON}_{MONTH}.csv
+                Monthly{Type}_{SITE}_{YYYYMON}.csv
             </div>
 
             <div class="naming-examples">
                 <div class="example">
-                    <code>GAA_COVID_2025-26_JUL.csv</code>
-                    <span>Georgia COVID data for July</span>
+                    <code>MonthlyAllCOVID_BAA_2024JAN.csv</code>
+                    <span>NYC COVID data for January 2024</span>
                 </div>
                 <div class="example">
-                    <code>NYA_FLU_2025-26_OCT.csv</code>
-                    <span>New York Flu data for October</span>
+                    <code>MonthlyFlu_GAA_2025FEB.csv</code>
+                    <span>Georgia Flu data for February 2025</span>
                 </div>
                 <div class="example">
-                    <code>CAA_RSV_2024-25_SEP.csv</code>
-                    <span>California RSV data for September</span>
+                    <code>MonthlyRSV_NCA_2024JUL.csv</code>
+                    <span>North Carolina RSV data for July 2024</span>
                 </div>
             </div>
 
             <div class="naming-parts">
                 <ul>
-                    <li><strong>SITE_CODE:</strong> 3-letter IIS grantee code (GAA, NYA, CAA, TXA...)</li>
-                    <li><strong>TYPE:</strong> COVID, FLU, or RSV</li>
-                    <li><strong>SEASON:</strong> Fiscal year format YYYY-YY (2025-26)</li>
-                    <li><strong>MONTH:</strong> JAN, FEB, MAR, APR, MAY, JUN, JUL, AUG, SEP, OCT, NOV, DEC</li>
+                    <li><strong>Prefix:</strong> MonthlyAllCOVID, MonthlyFlu, or MonthlyRSV</li>
+                    <li><strong>SITE:</strong> 3-letter IIS grantee code (GAA, NYA, BAA, NCA...)</li>
+                    <li><strong>YYYY:</strong> 4-digit year (2024, 2025)</li>
+                    <li><strong>MON:</strong> 3-letter month (JAN, FEB, MAR, APR, MAY, JUN, JUL, AUG, SEP, OCT, NOV, DEC)</li>
                 </ul>
             </div>
         </div>
