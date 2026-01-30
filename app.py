@@ -944,6 +944,12 @@ def validation_detail(submission_id):
     if not submission:
         return 'Submission not found', 404
 
+    # Ensure preview fields exist (for backwards compatibility with old submissions)
+    if 'preview_columns' not in submission:
+        submission['preview_columns'] = []
+    if 'preview_data' not in submission:
+        submission['preview_data'] = []
+
     return render_template('validation_detail.html', submission=submission)
 
 @app.route('/api/clear', methods=['POST'])
