@@ -464,6 +464,7 @@
         {% endif %}
     </div>
 
+    {% if submission.preview_data %}
     <script>
         // Build error map and highlight cells
         const errors = {{ submission.errors | tojson | safe }};
@@ -526,5 +527,6 @@
             if (header) header.classList.add('error-col');
         });
     </script>
+    {% endif %}
 </body>
 </html>
