@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - PRISM Validator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        nav {
+            background: linear-gradient(135deg, #1a5276 0%, #2980b9 100%);
+            padding: 15px 20px;
+            margin-bottom: 30px;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            gap: 30px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        nav a:hover, nav a.active {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: white;
+            margin-right: auto;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            color: #1a5276;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #666;
+        }
+
+        .config-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .config-card h2 {
+            color: #1a5276;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .current-period {
+            background: linear-gradient(135deg, #1a5276 0%, #2980b9 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .current-period .label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .current-period .value {
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #2980b9;
+        }
+
+        .btn {
+            display: inline-block;
+            background: #2980b9;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background: #1a5276;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .info-text {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li class="logo">PRISM Validator</li>
+            <li><a href="/submit">Submit Data</a></li>
+            <li><a href="/validation">Dashboard</a></li>
+            <li><a href="/templates">Templates</a></li>
+            <li><a href="/admin" class="active">Admin</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>Admin Settings</h1>
+            <p>Configure the expected submission period</p>
+        </header>
+
+        <div class="config-card">
+            <h2>Expected Submission Period</h2>
+
+            <div class="current-period">
+                <div class="label">Currently Accepting</div>
+                <div class="value" id="currentPeriod">{{ config.expected_year }}{{ config.expected_month }}</div>
+            </div>
+
+            <div id="alertBox" class="alert"></div>
+
+            <form id="configForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="year">Year</label>
+                        <select id="year" name="year">
+                            {% for y in range(2024, 2031) %}
+                            <option value="{{ y }}" {% if y == config.expected_year %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="month">Month</label>
+                        <select id="month" name="month">
+                            {% for m in months %}
+                            <option value="{{ m }}" {% if m == config.expected_month %}selected{% endif %}>{{ m }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Admin Password</label>
+                    <input type="password" id="password" placeholder="Enter password to save changes">
+                </div>
+
+                <button type="submit" class="btn">Update Submission Period</button>
+            </form>
+
+            <div class="info-text">
+                <strong>How it works:</strong> Files submitted must match the expected period. For example, if set to 2026JAN, only files named like <code>MonthlyAllCOVID_BAA_2026JAN.csv</code> will pass validation.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('configForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const year = document.getElementById('year').value;
+            const month = document.getElementById('month').value;
+            const password = document.getElementById('password').value;
+            const alertBox = document.getElementById('alertBox');
+
+            fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    expected_year: year,
+                    expected_month: month,
+                    password: password
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    alertBox.className = 'alert error show';
+                    alertBox.textContent = data.error;
+                } else {
+                    alertBox.className = 'alert success show';
+                    alertBox.textContent = 'Submission period updated successfully!';
+                    document.getElementById('currentPeriod').textContent = year + month;
+                    document.getElementById('password').value = '';
+                }
+            })
+            .catch(err => {
+                alertBox.className = 'alert error show';
+                alertBox.textContent = 'Error updating configuration';
+            });
+        });
+    </script>
+</body>
+</html>

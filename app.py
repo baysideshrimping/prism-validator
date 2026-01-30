@@ -23,6 +23,29 @@ os.makedirs('data', exist_ok=True)
 
 # Data storage
 DATA_FILE = 'data/submissions.json'
+CONFIG_FILE = 'data/config.json'
+
+# Default expected submission period (can be changed via admin)
+DEFAULT_EXPECTED_YEAR = 2026
+DEFAULT_EXPECTED_MONTH = 'JAN'
+
+def load_config():
+    """Load configuration including expected submission month"""
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            pass
+    return {
+        'expected_year': DEFAULT_EXPECTED_YEAR,
+        'expected_month': DEFAULT_EXPECTED_MONTH
+    }
+
+def save_config(config):
+    """Save configuration"""
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config, f, indent=2)
 
 # =============================================================================
 # TEMPLATE DEFINITIONS
@@ -271,6 +294,15 @@ def validate_filename(filename, result, df):
         result.add_error(0, 'filename',
             f'Invalid month in filename: {month}. Expected one of: {", ".join(FILENAME_MONTHS)}')
         return
+
+    # Check against expected submission period
+    config = load_config()
+    expected_year = config.get('expected_year', DEFAULT_EXPECTED_YEAR)
+    expected_month = config.get('expected_month', DEFAULT_EXPECTED_MONTH)
+
+    if year != str(expected_year) or month != expected_month:
+        result.add_error(0, 'filename',
+            f'Submission period mismatch. Expected {expected_year}{expected_month}, got {year}{month}')
 
     # Check if file contains data for the month specified in filename
     if 'Month' in df.columns:
@@ -847,7 +879,41 @@ def api_clear():
 @app.route('/templates')
 def templates_page():
     """Page to download blank templates"""
-    return render_template('templates_download.html')
+    config = load_config()
+    return render_template('templates_download.html', config=config)
+
+@app.route('/admin')
+def admin_page():
+    """Admin page to configure expected submission period"""
+    config = load_config()
+    return render_template('admin.html', config=config, months=FILENAME_MONTHS)
+
+@app.route('/api/config', methods=['POST'])
+def update_config():
+    """Update expected submission period"""
+    data = request.get_json() or {}
+    password = data.get('password', '')
+
+    if password != 'prism2024':
+        return jsonify({'error': 'Incorrect password'}), 401
+
+    config = load_config()
+
+    if 'expected_year' in data:
+        try:
+            config['expected_year'] = int(data['expected_year'])
+        except:
+            return jsonify({'error': 'Invalid year'}), 400
+
+    if 'expected_month' in data:
+        month = data['expected_month'].upper()
+        if month in FILENAME_MONTHS:
+            config['expected_month'] = month
+        else:
+            return jsonify({'error': 'Invalid month'}), 400
+
+    save_config(config)
+    return jsonify({'success': True, 'config': config})
 
 @app.route('/download/<template_type>')
 def download_template(template_type):
